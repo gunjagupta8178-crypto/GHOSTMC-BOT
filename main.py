@@ -72,7 +72,7 @@ async def on_member_join(member):
     embed.set_footer(text="GHOSTMC • Best DC & MC Setups")
     await channel.send(content=f"{member.mention}", embed=embed, file=file)
 
-@bot.command(name="I")
+@bot.command(name="info")
 async def bot_info(ctx):
     embed = discord.Embed(title="GHOSTMC BOT • INFO", color=0x00FF64)
     embed.add_field(name="Servers", value=f"{len(bot.guilds)}")
