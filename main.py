@@ -177,7 +177,7 @@ async def giveaway(interaction: discord.Interaction, prize: str, duration: int, 
         winner = random.choice(users).author.mention
         await interaction.channel.send(f"🎉 Giveaway Ended! Prize: **{prize}**\nWinner: {winner} Congratulations!")
 # --- INVITE TRACKER ---
-@bot.command(name="I")
+@bot.command(name="I", aliases=["i"])
 async def invites_cmd(ctx):
     async with aiosqlite.connect("ghostmc.db") as db:
         async with db.execute("SELECT real, fake, left_inv, bonus FROM invites WHERE user_id=?", (ctx.author.id,)) as cur:
@@ -198,11 +198,20 @@ async def invites_cmd(ctx):
     await ctx.send(embed=embed)
 
 # --- TICKET SYSTEM ---
+class CloseView(View):
+    def __init__(self):
+        super().__init__(timeout=None)
+    @discord.ui.button(label="🔒 Close Ticket", style=discord.ButtonStyle.red, custom_id="close_ticket")
+    async def close_ticket(self, interaction: discord.Interaction, button):
+        await interaction.response.send_message("Ticket 5 sec me band ho jayega...")
+        await asyncio.sleep(5)
+        await interaction.channel.delete()
+
 class TicketView(View):
     def __init__(self):
         super().__init__(timeout=None)
     @discord.ui.button(label="🎫 Create Ticket", style=discord.ButtonStyle.green, custom_id="create_ticket")
-    async def create_ticket(self, interaction: discord.Interaction, button: Button):
+    async def create_ticket(self, interaction: discord.Interaction, button):
         guild = interaction.guild
         overwrites = {
             guild.default_role: discord.PermissionOverwrite(view_channel=False),
@@ -210,13 +219,23 @@ class TicketView(View):
             guild.me: discord.PermissionOverwrite(view_channel=True)
         }
         channel = await guild.create_text_channel(f"ticket-{interaction.user.name}", overwrites=overwrites)
-        await channel.send(f"{interaction.user.mention} Ticket created! Staff will be here soon.")
+        embed = discord.Embed(title="Ticket Created", description=f"{interaction.user.mention} Staff yaha ayega, apna issue batao.", color=0x00FF64)
+        await channel.send(embed=embed, view=CloseView())
         await interaction.response.send_message(f"Ticket created {channel.mention}", ephemeral=True)
 
 @bot.tree.command(name="ticket", description="Ticket panel bhejo")
 async def ticket_panel(interaction: discord.Interaction):
-    embed = discord.Embed(title="🎫 GHOSTMC Support", description="Neeche button dabao ticket kholne ke liye\n**Best DC & MC Setups**", color=0x00FF64)
+    embed = discord.Embed(title="GHOSTMC Support", description="Neeche button dabao ticket kholne ke liye!")
     await interaction.channel.send(embed=embed, view=TicketView())
     await interaction.response.send_message("Panel sent!", ephemeral=True)
-    
+
+@bot.command(name="close")
+async def close_cmd(ctx):
+    if "ticket-" in ctx.channel.name:
+        await ctx.send("Closing ticket...")
+        await asyncio.sleep(2)
+        await ctx.channel.delete()
+    else:
+        await ctx.send("Ye command sirf ticket channel me kaam karta hai!")
+
 bot.run(TOKEN)
