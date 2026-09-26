@@ -237,5 +237,67 @@ async def close_cmd(ctx):
         await ctx.channel.delete()
     else:
         await ctx.send("Ye command sirf ticket channel me kaam karta hai!")
+# INVITE LOG FIXED
+INV_FILE = "invites.json"
+LOG_FILE = "invite_log.json"
 
+invites_data = {}
+if os.path.exists(INV_FILE):
+    invites_data = json.load(open(INV_FILE))
+
+INVITE_CH = None
+if os.path.exists(LOG_FILE):
+    INVITE_CH = json.load(open(LOG_FILE)).get("channel_id")
+
+invite_cache = {}
+
+def save_inv():
+    json.dump(invites_data, open(INV_FILE, "w"))
+
+@bot.tree.command(name="inviteset", description="Is channel me logs ayenge")
+async def inviteset_slash(interaction: discord.Interaction):
+    global INVITE_CH
+    INVITE_CH = interaction.channel.id
+    json.dump({"channel_id": INVITE_CH}, open(LOG_FILE, "w"))
+    await interaction.response.send_message(f"Logs yaha ayenge {interaction.channel.mention}", ephemeral=True)
+
+@bot.event
+async def on_ready():
+    await bot.tree.sync()
+    for g in bot.guilds:
+        try:
+            lst = await g.invites()
+            d = {}
+            for i in lst:
+                d[i.code] = i.uses
+            invite_cache[g.id] = d
+        except:
+            pass
+
+@bot.event
+async def on_member_join(member):
+    try:
+        new = await member.guild.invites()
+        old = invite_cache.get(member.guild.id, {})
+        for inv in new:
+            if inv.uses > old.get(inv.code, 0):
+                uid = str(inv.inviter.id)
+                invites_data[uid] = invites_data.get(uid, 0) + 1
+                save_inv()
+                if INVITE_CH:
+                    ch = member.guild.get_channel(INVITE_CH)
+                    if ch:
+                        msg = f"**{member.name} HAS BEEN INVITED BY {inv.inviter.name} | TOTAL: {invites_data[uid]}**"
+                        await ch.send(msg)
+                break
+        d2 = {}
+        for i in new:
+            d2[i.code] = i.uses
+        invite_cache[member.guild.id] = d2
+    except:
+        pass
+
+TOKEN = os.getenv("TOKEN")
 bot.run(TOKEN)
+
+
