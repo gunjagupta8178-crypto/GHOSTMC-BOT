@@ -212,5 +212,50 @@ async def invite_check(ctx, member: discord.Member = None):
     embed.set_thumbnail(url=member.display_avatar.url)
     embed.set_footer(text="GhostMc • Invite Tracker")
     await ctx.send(embed=embed)
+    # --- FINAL LEVEL SYSTEM ---
+
+if os.path.exists("levels.json"):
+    with open("levels.json", "r") as f:
+        try: levels = json.load(f)
+        except: levels = {}
+else: levels = {}
+
+if os.path.exists("level_config.json"):
+    with open("level_config.json", "r") as f:
+        try: level_channels = json.load(f)
+        except: level_channels = {}
+else: level_channels = {}
+
+def save_levels():
+    with open("levels.json", "w") as f: json.dump(levels, f, indent=2)
+def save_level_channels():
+    with open("level_config.json", "w") as f: json.dump(level_channels, f, indent=2)
+def get_level(xp):
+    return math.floor(0.1 * math.sqrt(xp))
+
+@bot.event
+async def on_message(message):
+    if message.author.bot or not message.guild: return
+    key = f"{message.guild.id}_{message.author.id}"
+    if key not in levels: levels[key] = {"xp": 0, "level": 0}
+    levels[key]["xp"] += random.randint(15, 25)
+    new_level = get_level(levels[key]["xp"])
+    if new_level > levels[key]["level"]:
+        levels[key]["level"] = new_level
+        gid = str(message.guild.id)
+        # jaha /levelup-set kiya hai wahi bhejega
+        if gid in level_channels:
+            ch = bot.get_channel(level_channels[gid])
+            if ch: await ch.send(f"GG {message.author.mention} tu **Level {new_level}** pe pahunch gaya! 🔥")
+        else:
+            await message.channel.send(f"GG {message.author.mention} tu **Level {new_level}** pe pahunch gaya! 🔥")
+    save_levels()
+    await bot.process_commands(message)
+
+@bot.tree.command(name="levelup-set", description="Jaha ye likhoge wahi level up message ayega")
+async def levelup_set(interaction: discord.Interaction):
+    level_channels[str(interaction.guild.id)] = interaction.channel.id
+    save_level_channels()
+    await interaction.response.send_message(f"Done! ✅ Ab se level up message yahi ayega: {interaction.channel.mention}")
 
 bot.run(os.getenv("TOKEN"))
