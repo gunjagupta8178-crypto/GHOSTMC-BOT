@@ -3,3 +3,4 @@ aiohttp==3.9.5
 python-dotenv
 aiosqlite
 Pillow
+audioop-lts
