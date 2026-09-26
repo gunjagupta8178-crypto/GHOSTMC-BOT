@@ -9,6 +9,7 @@ from PIL import Image, ImageDraw, ImageFont
 import io
 import datetime
 import os
+import json
 
 # Railway Variable se lega, nahi mila to niche wale se
 TOKEN = os.getenv("TOKEN") or "YOUR_BOT_TOKEN_HERE"
