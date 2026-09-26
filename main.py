@@ -1,6 +1,7 @@
 import discord
 from discord.ext import commands, tasks
 from discord import app_commands
+from discord.ui import View, Button
 import aiosqlite
 import asyncio
 import random
@@ -18,6 +19,8 @@ bot = commands.Bot(command_prefix="-", intents=intents)
 
 async def init_db():
     async with aiosqlite.connect("ghostmc.db") as db:
+        await db.execute("CREATE TABLE IF NOT EXISTS invites (user_id INTEGER PRIMARY KEY, real INTEGER, fake INTEGER, left_inv INTEGER, bonus INTEGER)")
+        await db.execute("CREATE TABLE IF NOT EXISTS tickets (channel_id INTEGER, user_id INTEGER, guild_id INTEGER)")
         await db.execute("CREATE TABLE IF NOT EXISTS autoresponder (guild_id INTEGER, trigger_word TEXT, response TEXT)")
         await db.execute("CREATE TABLE IF NOT EXISTS giveaways (message_id INTEGER, channel_id INTEGER, end_time REAL, prize TEXT)")
         await db.commit()
@@ -173,5 +176,47 @@ async def giveaway(interaction: discord.Interaction, prize: str, duration: int, 
     if users:
         winner = random.choice(users).author.mention
         await interaction.channel.send(f"🎉 Giveaway Ended! Prize: **{prize}**\nWinner: {winner} Congratulations!")
+# --- INVITE TRACKER ---
+@bot.command(name="I")
+async def invites_cmd(ctx):
+    async with aiosqlite.connect("ghostmc.db") as db:
+        async with db.execute("SELECT real, fake, left_inv, bonus FROM invites WHERE user_id=?", (ctx.author.id,)) as cur:
+            row = await cur.fetchone()
+    if not row:
+        real, fake, left, bonus = 0,0,0,0
+    else:
+        real, fake, left, bonus = row
+    
+    total = real + bonus - left
+    embed = discord.Embed(title=f"📨 {ctx.author.name} - Invites", color=0x00FF64)
+    embed.add_field(name="Real", value=str(real), inline=True)
+    embed.add_field(name="Fake", value=str(fake), inline=True)
+    embed.add_field(name="Left", value=str(left), inline=True)
+    embed.add_field(name="Rejoin", value="0", inline=True)
+    embed.add_field(name="Total", value=str(total), inline=True)
+    embed.set_thumbnail(url=ctx.author.display_avatar.url)
+    await ctx.send(embed=embed)
 
+# --- TICKET SYSTEM ---
+class TicketView(View):
+    def __init__(self):
+        super().__init__(timeout=None)
+    @discord.ui.button(label="🎫 Create Ticket", style=discord.ButtonStyle.green, custom_id="create_ticket")
+    async def create_ticket(self, interaction: discord.Interaction, button: Button):
+        guild = interaction.guild
+        overwrites = {
+            guild.default_role: discord.PermissionOverwrite(view_channel=False),
+            interaction.user: discord.PermissionOverwrite(view_channel=True, send_messages=True),
+            guild.me: discord.PermissionOverwrite(view_channel=True)
+        }
+        channel = await guild.create_text_channel(f"ticket-{interaction.user.name}", overwrites=overwrites)
+        await channel.send(f"{interaction.user.mention} Ticket created! Staff will be here soon.")
+        await interaction.response.send_message(f"Ticket created {channel.mention}", ephemeral=True)
+
+@bot.tree.command(name="ticket", description="Ticket panel bhejo")
+async def ticket_panel(interaction: discord.Interaction):
+    embed = discord.Embed(title="🎫 GHOSTMC Support", description="Neeche button dabao ticket kholne ke liye\n**Best DC & MC Setups**", color=0x00FF64)
+    await interaction.channel.send(embed=embed, view=TicketView())
+    await interaction.response.send_message("Panel sent!", ephemeral=True)
+    
 bot.run(TOKEN)
