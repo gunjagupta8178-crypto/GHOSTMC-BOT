@@ -238,20 +238,18 @@ async def close_cmd(ctx):
         await ctx.channel.delete()
     else:
         await ctx.send("Ye command sirf ticket channel me kaam karta hai!")
-# INVITE LOG FIXED
 INV_FILE = "invites.json"
 LOG_FILE = "invite_log.json"
-
-invites_data = {}
-if os.path.exists(INV_FILE):
-    invites_data = json.load(open(INV_FILE))
+invites_data = json.load(open(INV_FILE)) if os.path.exists(INV_FILE) else {}
 
 INVITE_CH = None
 if os.path.exists(LOG_FILE):
-    INVITE_CH = json.load(open(LOG_FILE)).get("channel_id")
+    try:
+        INVITE_CH = json.load(open(LOG_FILE)).get("channel_id")
+    except:
+        INVITE_CH = None
 
 invite_cache = {}
-
 def save_inv():
     json.dump(invites_data, open(INV_FILE, "w"))
 
@@ -268,15 +266,37 @@ async def on_ready():
     for g in bot.guilds:
         try:
             lst = await g.invites()
-            d = {}
+            d1 = {}
             for i in lst:
-                d[i.code] = i.uses
-            invite_cache[g.id] = d
+                d1[i.code] = i.uses
+            invite_cache[g.id] = d1
         except:
             pass
 
+WELCOME_FILE = "welcome.json"
+WELCOME_CH = json.load(open(WELCOME_FILE)).get("channel_id") if os.path.exists(WELCOME_FILE) else None
+
+@bot.tree.command(name="welcomeset", description="Welcome yaha ayega")
+async def welcomeset(interaction: discord.Interaction):
+    global WELCOME_CH
+    WELCOME_CH = interaction.channel.id
+    json.dump({"channel_id": WELCOME_CH}, open(WELCOME_FILE, "w"))
+    await interaction.response.send_message(f"Welcome set {interaction.channel.mention} pe", ephemeral=True)
+
 @bot.event
 async def on_member_join(member):
+    # 1. WELCOME
+    if WELCOME_CH:
+        try:
+            ch = member.guild.get_channel(WELCOME_CH)
+            if ch:
+                content = f"Welcome {member.mention} to **{member.guild.name}!**"
+                desc = f"👋 WELCOME TO\n**GAMINGBHAI CLOUD** ☁️\n\n🎉 HEY {member.mention}!\n💙 GREAT TO HAVE YOU HERE!\n\n🚀 YOUR DESTINATION FOR:\n💻 POWERFUL HOSTING\n⚡ FAST & STABLE SERVERS"
+                embed = discord.Embed(description=desc, color=0x3498DB)
+                await ch.send(content=content, embed=embed)
+        except:
+            pass
+    # 2. INVITE
     try:
         new = await member.guild.invites()
         old = invite_cache.get(member.guild.id, {})
@@ -286,15 +306,11 @@ async def on_member_join(member):
                 invites_data[uid] = invites_data.get(uid, 0) + 1
                 save_inv()
                 if INVITE_CH:
-                    ch = member.guild.get_channel(INVITE_CH)
-                    if ch:
-                        msg = f"**{member.name} HAS BEEN INVITED BY {inv.inviter.name} | TOTAL: {invites_data[uid]}**"
-                        await ch.send(msg)
+                    log_ch = member.guild.get_channel(INVITE_CH)
+                    if log_ch:
+                        await log_ch.send(f"**{member.name} HAS BEEN INVITED BY {inv.inviter.name} | TOTAL: {invites_data[uid]}**")
                 break
-        d2 = {}
-        for i in new:
-            d2[i.code] = i.uses
-        invite_cache[member.guild.id] = d2
+        invite_cache[member.guild.id] = {i.code: i.uses for i in new}
     except:
         pass
 
