@@ -11,7 +11,7 @@ import os
 
 # Railway Variable se lega, nahi mila to niche wale se
 TOKEN = os.getenv("TOKEN") or "YOUR_BOT_TOKEN_HERE"
-WELCOME_CHANNEL_ID = 1553252269707890739
+WELCOME_CHANNEL_ID = int(os.getenv("WELCOME_CHANNEL_ID") or "1553252269078907030")
 
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="-", intents=intents)
