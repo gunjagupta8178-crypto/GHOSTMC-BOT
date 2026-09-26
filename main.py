@@ -257,5 +257,82 @@ async def levelup_set(interaction: discord.Interaction):
     level_channels[str(interaction.guild.id)] = interaction.channel.id
     save_level_channels()
     await interaction.response.send_message(f"Done! ✅ Ab se level up message yahi ayega: {interaction.channel.mention}")
+# --- AUTOROLE + GIVEAWAY SYSTEM ---
+
+import asyncio
+import datetime
+
+# --- AUTOROLE CONFIG ---
+if os.path.exists("autorole.json"):
+    with open("autorole.json", "r") as f:
+        try: autorole_config = json.load(f)
+        except: autorole_config = {}
+else: autorole_config = {}
+
+def save_autorole():
+    with open("autorole.json", "w") as f: json.dump(autorole_config, f, indent=2)
+
+@bot.tree.command(name="autorole-set", description="Join par auto role dega")
+async def autorole_set(interaction: discord.Interaction, role: discord.Role):
+    autorole_config[str(interaction.guild.id)] = role.id
+    save_autorole()
+    await interaction.response.send_message(f"Done! ✅ Ab {role.mention} auto milega join par.", ephemeral=True)
+
+# Welcome + AutoRole ek hi event me
+@bot.event
+async def on_member_join(member):
+    # 1. AutoRole
+    gid = str(member.guild.id)
+    if gid in autorole_config:
+        role = member.guild.get_role(autorole_config[gid])
+        if role:
+            try: await member.add_roles(role)
+            except: pass
+
+    # 2. Welcome (tera purana welcome code yaha rahega)
+    if gid in welcome_channels:
+        ch = bot.get_channel(welcome_channels[gid])
+        if ch:
+            embed = discord.Embed(description=f"Welcome {member.mention} to **{member.guild.name}**!", color=0x2b2d31)
+            await ch.send(embed=embed)
+
+@bot.event
+async def on_member_remove(member):
+    gid = str(member.guild.id)
+    if gid in welcome_channels:
+        ch = bot.get_channel(welcome_channels[gid])
+        if ch:
+            await ch.send(f"**{member.name}** left the server. 😢")
+
+# --- GIVEAWAY SYSTEM ---
+class GiveawayView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+        self.users = []
+
+    @discord.ui.button(label="🎉 Join", style=discord.ButtonStyle.green, custom_id="giveaway_join")
+    async def join(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id not in self.users:
+            self.users.append(interaction.user.id)
+            await interaction.response.send_message("Tu giveaway me join ho gaya! 🎉", ephemeral=True)
+        else:
+            await interaction.response.send_message("Tu pehle se joined hai!", ephemeral=True)
+
+@bot.tree.command(name="giveaway", description="Giveaway start karo")
+async def giveaway(interaction: discord.Interaction, prize: str, winners: int, minutes: int):
+    view = GiveawayView()
+    end_time = datetime.datetime.now() + datetime.timedelta(minutes=minutes)
+    embed = discord.Embed(title="🎉 GIVEAWAY 🎉", description=f"**Prize:** {prize}\n**Winners:** {winners}\n**Ends:** <t:{int(end_time.timestamp())}:R>\n\nNeeche button dabao join karne ke liye!", color=0xFFD700)
+    await interaction.response.send_message(embed=embed, view=view)
+
+    await asyncio.sleep(minutes * 60)
+
+    if len(view.users) == 0:
+        await interaction.followup.send("Koi join nahi hua 😢")
+        return
+
+    win_list = random.sample(view.users, min(winners, len(view.users)))
+    mentions = ", ".join([f"<@{uid}>" for uid in win_list])
+    await interaction.followup.send(f"Congratulations {mentions}! Tum jeet gaye **{prize}**! 🎉")
 
 bot.run(os.getenv("TOKEN"))
