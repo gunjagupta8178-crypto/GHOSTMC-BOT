@@ -1,5 +1,6 @@
 import discord
 from discord.ext import commands
+from discord import app_commands
 import json, os
 COINS_FILE = "coins.json"
 REDEEM_FILE = "redeemcodes.json"
