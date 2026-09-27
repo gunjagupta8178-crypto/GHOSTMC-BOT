@@ -1,6 +1,16 @@
 import discord
 from discord.ext import commands
 import json, os
+COINS_FILE = "coins.json"
+REDEEM_FILE = "redeemcodes.json"
+
+def load_json(path):
+    try:
+        with open(path, "r") as f: return json.load(f)
+    except: return {}
+
+def save_json(path, data):
+    with open(path, "w") as f: json.dump(f, data, indent=4)
 
 intents = discord.Intents.default()
 intents.members = True
@@ -420,6 +430,70 @@ async def cash(interaction: discord.Interaction):
     data = get_owo_data()
     bal = data.get(str(interaction.user.id), {}).get("cash", 0)
     await interaction.response.send_message(f"💰 You have **{bal} cowoncy**")
+    
+@bot.tree.command(name="redeemcodecreate", description="Naya redeem code banao")
+@app_commands.describe(code="Code naam jaise GHOSTMC", coins="Kitne coins milenge", max_use="Kitne log use kar sakte hai")
+async def redeemcodecreate(interaction: discord.Interaction, code: str, coins: int, max_use: int = 100):
+    if not interaction.user.guild_permissions.administrator:
+        return await interaction.response.send_message("❌ Only Admin can use!", ephemeral=True)
+    db = load_json(REDEEM_FILE)
+    code = code.upper()
+    db[code] = {"coins": coins, "max_use": max_use, "used_by": [], "uses": 0}
+    save_json(REDEEM_FILE, db)
+    await interaction.response.send_message(f"✅ Code Created: **{code}** = {coins} Coins | Max: {max_use}")
 
+
+@bot.tree.command(name="redeem", description="Code redeem karo")
+async def redeem(interaction: discord.Interaction, code: str):
+    code = code.upper()
+    rdb = load_json(REDEEM_FILE)
+    cdb = load_json(COINS_FILE)
+    if code not in rdb:
+        return await interaction.response.send_message("❌ Invalid code!", ephemeral=True)
+    d = rdb[code]
+    if interaction.user.id in d["used_by"]:
+        return await interaction.response.send_message("❌ Tu already redeem kar chuka hai!", ephemeral=True)
+    if d["uses"] >= d["max_use"]:
+        return await interaction.response.send_message("❌ Code expire ho gaya!", ephemeral=True)
+    uid = str(interaction.user.id)
+    cdb[uid] = cdb.get(uid, 0) + d["coins"]
+    d["used_by"].append(interaction.user.id)
+    d["uses"] += 1
+    save_json(REDEEM_FILE, rdb)
+    save_json(COINS_FILE, cdb)
+    await interaction.response.send_message(f"🎉 Redeemed! Tujhe **{d['coins']} Coins** mil gaye!")
+
+@bot.tree.command(name="addcoins", description="Kisi ko coins do")
+async def addcoins(interaction: discord.Interaction, member: discord.Member, amount: int):
+    if not interaction.user.guild_permissions.administrator: return
+    db = load_json(COINS_FILE)
+    db[str(member.id)] = db.get(str(member.id), 0) + amount
+    save_json(COINS_FILE, db)
+    await interaction.response.send_message(f"✅ {member.mention} ko {amount} coins diye. Total: {db[str(member.id)]}")
+
+@bot.tree.command(name="removecoins", description="Kisi ke coins hatao")
+async def removecoins(interaction: discord.Interaction, member: discord.Member, amount: int):
+    if not interaction.user.guild_permissions.administrator: return
+    db = load_json(COINS_FILE)
+    db[str(member.id)] = max(0, db.get(str(member.id), 0) - amount)
+    save_json(COINS_FILE, db)
+    await interaction.response.send_message(f"✅ {member.mention} se {amount} coins hata diye. Bache: {db[str(member.id)]}")
+
+@bot.tree.command(name="coins", description="Apne coins check karo")
+async def coins_cmd(interaction: discord.Interaction):
+    db = load_json(COINS_FILE)
+    bal = db.get(str(interaction.user.id), 0)
+    await interaction.response.send_message(f"💰 Tere paas **{bal} Coins** hai.")
+
+@bot.tree.command(name="shop", description="Coin shop dekho")
+async def shop(interaction: discord.Interaction):
+    embed = discord.Embed(title="🛒 GhostMC Coin Shop", color=0x9b59b6)
+    embed.add_field(name="400 Coins", value="= 40K In-Game Money", inline=False)
+    embed.add_field(name="600 Coins", value="= 70K In-Game Money", inline=False)
+    embed.add_field(name="800 Coins", value="= 90K In-Game Money", inline=False)
+    embed.add_field(name="1600 Coins", value="= 200K In-Game Money", inline=False)
+    embed.add_field(name="2000 Coins", value="= VIP RANK", inline=False)
+    embed.add_field(name="\u200b", value="**Make ticket to exchange** 🎫", inline=False)
+    await interaction.response.send_message(embed=embed)
 
 bot.run(os.getenv("TOKEN"))
