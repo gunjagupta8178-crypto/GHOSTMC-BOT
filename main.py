@@ -14,7 +14,7 @@ def load_json(path):
 def save_json(path, data):
     with open(path, "w") as f: json.dump(f, data, indent=4)
 
-intents = discord.Intents.defaut()
+intents = discord.Intents.all()
 intents.members = True
 intents.message_content = True
 intents.invites = True
