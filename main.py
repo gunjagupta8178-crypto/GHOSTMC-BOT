@@ -2,6 +2,7 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 import json, os
+import math
 COINS_FILE = "coins.json"
 REDEEM_FILE = "redeemcodes.json"
 
@@ -13,7 +14,7 @@ def load_json(path):
 def save_json(path, data):
     with open(path, "w") as f: json.dump(f, data, indent=4)
 
-intents = discord.Intents.default()
+intents = discord.Intents.defaut()
 intents.members = True
 intents.message_content = True
 intents.invites = True
@@ -430,23 +431,24 @@ async def zoo(interaction: discord.Interaction):
 async def cash(interaction: discord.Interaction):
     data = get_owo_data()
     bal = data.get(str(interaction.user.id), {}).get("cash", 0)
-    await interaction.response.send_message(f"💰 You 
-    @bot.tree.command(name="coins", description="Apne coins dekho")
+    await interaction.response.send_message(f"You have {bal} coins")
+
+@bot.tree.command(name="coins", description="Apne coins dekho")
 async def coins(interaction: discord.Interaction):
-    data = get_own_data()
+    data = get_owo_data()
     bal = data.get(str(interaction.user.id), {}).get("cash", 0)
-    await interaction.response.send_message(f"{interaction.user.mention} Tere paas **{bal} Coins** hai!", ephemeral=True)
+    await interaction.response.send_message(f"{interaction.user.mention} Tere paas {bal} Coins hai!", ephemeral=True)
 
 @bot.tree.command(name="redeemcreate", description="Naya redeem code banao")
 @app_commands.describe(code="Code naam GHOSTMC jaise", coins="Kitne coins", max_use="Kitne log use karenge")
 async def redeemcreate(interaction: discord.Interaction, code: str, coins: int, max_use: int):
-    if not interaction.user.guild_permissions.administrator:
-        await interaction.response.send_message("Admin only!", ephemeral=True)
+    if interaction.user.id!= interaction.guild.owner_id:
+        await interaction.response.send_message("Sirf Owner use kar sakta hai!", ephemeral=True)
         return
     codes = load("redeemcodes")
     codes[code.upper()] = {"coins": coins, "max_use": max_use, "used_by": []}
     save("redeemcodes", codes)
-    await interaction.response.send_message(f"✅ Code Created: **{code.upper()}** = {coins} Coins | Max: {max_use}")
+    await interaction.response.send_message(f"Code Created: {code.upper()} = {coins} Coins | Max: {max_use}")
 
 @bot.tree.command(name="redeem", description="Code redeem karo")
 @app_commands.describe(code="Code likho")
@@ -454,7 +456,7 @@ async def redeem(interaction: discord.Interaction, code: str):
     code = code.upper()
     codes = load("redeemcodes")
     if code not in codes:
-        await interaction.response.send_message("❌ Galat code!", ephemeral=True)
+        await interaction.response.send_message("Galat code!", ephemeral=True)
         return
     d = codes[code]
     uid = str(interaction.user.id)
@@ -466,25 +468,25 @@ async def redeem(interaction: discord.Interaction, code: str):
         return
     d["used_by"].append(uid)
     save("redeemcodes", codes)
-    all_data = get_own_data()
+    all_data = get_owo_data()
     if uid not in all_data:
         all_data[uid] = {"cash": 0, "zoo": []}
     all_data[uid]["cash"] += d["coins"]
-    save_own_data(all_data)
-    await interaction.response.send_message(f"✅ {d['coins']} Coins mil gaye! Code: {code}")
+    save_owo_data(all_data)
+    await interaction.response.send_message(f"{d['coins']} Coins mil gaye! Code: {code}")
 
 @bot.tree.command(name="coinsadd", description="Kisi ko coins do")
 @app_commands.describe(user="Kisko dena hai", amount="Kitne coins")
 async def coinsadd(interaction: discord.Interaction, user: discord.Member, amount: int):
-    if not interaction.user.guild_permissions.administrator:
-        await interaction.response.send_message("Admin only!", ephemeral=True)
+    if interaction.user.id!= interaction.guild.owner_id:
+        await interaction.response.send_message("Sirf Owner use kar sakta hai!", ephemeral=True)
         return
-    all_data = get_own_data()
+    all_data = get_owo_data()
     uid = str(user.id)
     if uid not in all_data:
         all_data[uid] = {"cash": 0, "zoo": []}
     all_data[uid]["cash"] += amount
-    save_own_data(all_data)
-    await interaction.response.send_message(f"✅ {user.mention} ko {amount} Coins diye! Total: {all_data[uid]['cash']}")
+    save_owo_data(all_data)
+    await interaction.response.send_message(f"{user.mention} ko {amount} Coins diye! Total: {all_data[uid]['cash']}")
 
 bot.run(os.getenv("DISCORD_TOKEN"))
