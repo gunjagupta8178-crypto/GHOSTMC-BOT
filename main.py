@@ -420,5 +420,38 @@ async def cash(interaction: discord.Interaction):
     data = get_owo_data()
     bal = data.get(str(interaction.user.id), {}).get("cash", 0)
     await interaction.response.send_message(f"💰 You have **{bal} cowoncy**")
+// INVITE TRACKER SYSTEM
+const invites = new Map();
+
+// Bot ready hote hi saare invites cache karo
+client.on('ready', async () => {
+  for (const guild of client.guilds.cache.values()) {
+    const guildInvites = await guild.invites.fetch().catch(() => null);
+    if (guildInvites) invites.set(guild.id, guildInvites);
+  }
+});
+
+client.on('inviteCreate', async (invite) => {
+  const guildInvites = await invite.guild.invites.fetch().catch(()=>null);
+  if (guildInvites) invites.set(invite.guild.id, guildInvites);
+});
+
+client.on('guildMemberAdd', async (member) => {
+  const channel = member.guild.channels.cache.find(c => c.name.includes('invite-logs'));
+  if (!channel) return;
+
+  const oldInvites = invites.get(member.guild.id);
+  const newInvites = await member.guild.invites.fetch().catch(()=>null);
+  if (!oldInvites || !newInvites) return;
+  
+  invites.set(member.guild.id, newInvites);
+
+  const usedInvite = newInvites.find(inv => {
+    const old = oldInvites.get(inv.code);
+    return old && inv.uses > old.uses;
+  });
+
+  const inviter = usedInvite ? usedInvite.inviter : null;
+  const isFake = (Date.now() - member.user.createdTimestamp) < 7 * 24 * 60 * 60 * 1000; // 7 din
 
 bot.run(os.getenv("TOKEN"))
