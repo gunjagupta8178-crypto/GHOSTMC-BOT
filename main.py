@@ -420,38 +420,87 @@ async def cash(interaction: discord.Interaction):
     data = get_owo_data()
     bal = data.get(str(interaction.user.id), {}).get("cash", 0)
     await interaction.response.send_message(f"💰 You have **{bal} cowoncy**")
-// INVITE TRACKER SYSTEM
-const invites = new Map();
+# --- INVITE TRACKER SYSTEM ONLY ---
+invites_cache = {}
+import datetime
 
-// Bot ready hote hi saare invites cache karo
-client.on('ready', async () => {
-  for (const guild of client.guilds.cache.values()) {
-    const guildInvites = await guild.invites.fetch().catch(() => null);
-    if (guildInvites) invites.set(guild.id, guildInvites);
-  }
-});
+@bot.event
+async def on_ready():
+    for guild in bot.guilds:
+        try:
+            invs = await guild.invites()
+            invites_cache[guild.id] = {i.code: i.uses for i in invs}
+        except:
+            pass
 
-client.on('inviteCreate', async (invite) => {
-  const guildInvites = await invite.guild.invites.fetch().catch(()=>null);
-  if (guildInvites) invites.set(invite.guild.id, guildInvites);
-});
+@bot.event
+async def on_invite_create(invite):
+    try:
+        invs = await invite.guild.invites()
+        invites_cache[invite.guild.id] = {i.code: i.uses for i in invs}
+    except:
+        pass
 
-client.on('guildMemberAdd', async (member) => {
-  const channel = member.guild.channels.cache.find(c => c.name.includes('invite-logs'));
-  if (!channel) return;
+@bot.event
+async def on_member_join(member):
+    guild = member.guild
+    channel = discord.utils.find(lambda c: "invite-logs" in c.name, guild.text_channels)
+    if not channel:
+        return
+    try:
+        new_invs = await guild.invites()
+        old_invs = invites_cache.get(guild.id, {})
+        used = None
+        for inv in new_invs:
+            if old_invs.get(inv.code, 0) < inv.uses:
+                used = inv
+                break
+        invites_cache[guild.id] = {i.code: i.uses for i in new_invs}
+        if not used or not used.inviter:
 
-  const oldInvites = invites.get(member.guild.id);
-  const newInvites = await member.guild.invites.fetch().catch(()=>null);
-  if (!oldInvites || !newInvites) return;
-  
-  invites.set(member.guild.id, newInvites);
+        is_fake = (datetime.datetime.now(datetime.timezone.utc) - member.created_at).days < 7
 
-  const usedInvite = newInvites.find(inv => {
-    const old = oldInvites.get(inv.code);
-    return old && inv.uses > old.uses;
-  });
+        try:
+            with open("data.json", "r") as f:
+                db = json.load(f)
+        except:
+            db = {}
+        uid = str(member.id)
+        is_rejoin = uid in 
 
-  const inviter = usedInvite ? usedInvite.inviter : null;
-  const isFake = (Date.now() - member.user.createdTimestamp) < 7 * 24 * 60 * 60 * 1000; // 7 din
+        # invite count add karo
+        if used.inviter:
+            inv_id = str(used.inviter.id)
+            if inv_id not in db:
+                db[inv_id] = {"invites": 0}
+            if not is_fake and not is_rejoin:
+                db[inv_id]["invites"] = db[inv_id].get("invites", 0) + 1
+            db[uid] = {"invites": db.get(uid, {}).get("invites", 0), "inviter": inv_id}
+            with open("data.json", "w") as f:
+                json.dump(db, f, indent=4)
+
+        embed = discord.Embed(
+            title = "FAKE" if is_fake else "REJOIN" if is_rejoin else "JOIN",
+            description = f"**Member:** {member.mention}\n**Invited by:** {used.inviter.mention}\n**Code:** {used.code}",
+            color = 0xFF0000 if is_fake else 0xFFFF00 if is_rejoin else 0x00FF00
+        )
+        await channel.send(embed=embed)
+
+@bot.event
+async def on_member_remove(member):
+    channel = discord.utils.find(lambda c: "invite-logs" in c.name, member.guild.text_channels)
+    if channel:
+        await channel.send(embed=discord.Embed(title="LEFT", description=f"**{member}** left the server", color=0xFF0000))
+
+# -i -I command
+@bot.command(name="i", aliases=["I", "invites", "Invites"])
+async def invites_cmd(ctx):
+    try:
+        with open("data.json", "r") as f:
+            db = json.load(f)
+        total = db.get(str(ctx.author.id), {}).get("invites", 0)
+    except:
+        total = 0
+    await ctx.send(f"{ctx.author.mention} Tere **{total}** invites hai!")
 
 bot.run(os.getenv("TOKEN"))
