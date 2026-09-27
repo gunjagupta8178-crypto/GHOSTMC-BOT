@@ -334,5 +334,91 @@ async def giveaway(interaction: discord.Interaction, prize: str, winners: int, m
     win_list = random.sample(view.users, min(winners, len(view.users)))
     mentions = ", ".join([f"<@{uid}>" for uid in win_list])
     await interaction.followup.send(f"Congratulations {mentions}! Tum jeet gaye **{prize}**! 🎉")
+# ===== OWO SYSTEM - DYNAMIC SET =====
+import random, json, os
+OWO_FILE = "owo_data.json"
+OWO_CHANNEL_FILE = "owo_channels.json"
+
+if not os.path.exists(OWO_FILE):
+    with open(OWO_FILE, "w") as f: json.dump({}, f)
+if not os.path.exists(OWO_CHANNEL_FILE):
+    with open(OWO_CHANNEL_FILE, "w") as f: json.dump([], f)
+
+def get_owo_data():
+    with open(OWO_FILE, "r") as f: return json.load(f)
+def save_owo_data(data):
+    with open(OWO_FILE, "w") as f: json.dump(data, f, indent=4)
+def get_owo_channels():
+    with open(OWO_CHANNEL_FILE, "r") as f: return json.load(f)
+
+def is_owo_channel():
+    async def predicate(interaction: discord.Interaction):
+        channels = get_owo_channels()
+        if interaction.channel.id not in channels:
+            await interaction.response.send_message(f"❌ Is channel me OWO set nahi hai! Pehle yaha `/owoset` likho.", ephemeral=True)
+            return False
+        return True
+    return discord.app_commands.check(predicate)
+
+@bot.tree.command(name="owoset", description="Is channel me OWO on karo")
+@discord.app_commands.checks.has_permissions(administrator=True)
+async def owoset(interaction: discord.Interaction):
+    channels = get_owo_channels()
+    if interaction.channel.id not in channels:
+        channels.append(interaction.channel.id)
+        with open(OWO_CHANNEL_FILE, "w") as f: json.dump(channels, f)
+        await interaction.response.send_message(f"✅ OWO system is channel me SET ho gaya! Ab yaha `/hunt` chalega.")
+    else:
+        await interaction.response.send_message(f"✅ Pehle se hi set hai yaha!")
+
+@bot.tree.command(name="owounset", description="Is channel se OWO hatao")
+@discord.app_commands.checks.has_permissions(administrator=True)
+async def owounset(interaction: discord.Interaction):
+    channels = get_owo_channels()
+    if interaction.channel.id in channels:
+        channels.remove(interaction.channel.id)
+        with open(OWO_CHANNEL_FILE, "w") as f: json.dump(channels, f)
+        await interaction.response.send_message(f"❌ OWO system hata diya is channel se.")
+    else:
+        await interaction.response.send_message(f"Yaha pe set hi nahi tha!")
+
+@bot.tree.command(name="hunt", description="Hunt animals like OWO")
+@is_owo_channel()
+async def hunt(interaction: discord.Interaction):
+    data = get_owo_data()
+    uid = str(interaction.user.id)
+    animals = ["🦌 Deer", "🐰 Bunny", "🐺 Wolf", "🐻 Bear", "🦊 Fox", "🐯 Tiger"]
+    found = random.choice(animals)
+    if uid not in data: data[uid] = {"cash": 0, "zoo": []}
+    data[uid]["zoo"].append(found)
+    data[uid]["cash"] += random.randint(10, 50)
+    save_owo_data(data)
+    await interaction.response.send_message(f"You hunted and found **{found}**!")
+
+@bot.tree.command(name="battle", description="Battle and earn cash")
+@is_owo_channel()
+async def battle(interaction: discord.Interaction):
+    data = get_owo_data()
+    uid = str(interaction.user.id)
+    if uid not in data: data[uid] = {"cash": 0, "zoo": []}
+    earn = random.randint(20, 100)
+    data[uid]["cash"] += earn
+    save_owo_data(data)
+    await interaction.response.send_message(f"You won! +{earn} cowoncy ⚔️")
+
+@bot.tree.command(name="zoo", description="Check your zoo")
+@is_owo_channel()
+async def zoo(interaction: discord.Interaction):
+    data = get_owo_data()
+    uid = str(interaction.user.id)
+    zoo_list = data.get(uid, {}).get("zoo", [])
+    await interaction.response.send_message(f"**Zoo:**\n" + "\n".join(zoo_list[-20:]) if zoo_list else "Zoo khali hai!")
+
+@bot.tree.command(name="cash", description="Check your cash")
+@is_owo_channel()
+async def cash(interaction: discord.Interaction):
+    data = get_owo_data()
+    bal = data.get(str(interaction.user.id), {}).get("cash", 0)
+    await interaction.response.send_message(f"💰 You have **{bal} cowoncy**")
 
 bot.run(os.getenv("TOKEN"))
